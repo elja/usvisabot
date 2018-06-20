@@ -1,10 +1,14 @@
 #!/usr/bin/env ruby
 
-require 'usbot'
+require './lib/usbot'
 require 'telegram/bot'
 
 class USBot
   TELEGRAM_TOKEN = "598842162:AAHDNTSqHmNI513OIMKWQW2fFtDgXrhC7b4"
+
+  def initialize(appointment_date:)
+    @appointment_date = Date.parse(appointment_date)
+  end
 
   def start!
     Telegram::Bot::Client.run(TELEGRAM_TOKEN) do |bot|
@@ -15,7 +19,7 @@ class USBot
         when /\/stop/
           stop_scheduler!
         when /\/refresh/
-          Thread.new { print_dates(bot, message) }
+          print_dates(bot, message)
         end
       end
     end
@@ -27,27 +31,50 @@ class USBot
     scraper = HTMLScraper.new
     dates = scraper.scrap!
 
-    dates.each_with_index do |(month, dates), index|
-      if dates[:available].any?
-        msg = "Dates for #{month}:\n\n"
-        msg += dates[:available].join("\n")
+    below_msg = "Dates Below Appointment (#{format_date(@appointment_date)}):\n\n"
+    above_msg = "Dates Above Appointment (#{format_date(@appointment_date)}):\n\n"
 
-        if index == 0
-          10.times do
-            bot.api.send_message(chat_id: message.chat.id, text: "!!!!!")
-            bot.api.send_message(chat_id: message.chat.id, text: msg)
-            bot.api.send_message(chat_id: message.chat.id, text: "!!!!!")
-          end
-        else
-          bot.api.send_message(chat_id: message.chat.id, text: msg)
-        end
+    dates_below = []
+    dates_above = []
+
+    dates.keys.each do |date|
+      next if date.monday?
+
+      if date < @appointment_date
+        dates_below << date
       else
-        msg = "Dates for #{month}:\n\n"
-        msg += "No dates available.."
-
-        bot.api.send_message(chat_id: message.chat.id, text: msg)
+        dates_above << date
       end
     end
+
+    if dates_below.any?
+      dates_below.each { |d| below_msg += date_str(d, dates[d]) }
+
+      10.times do
+        bot.api.send_message(chat_id: message.chat.id, text: "!!!!!!!!!!!!!!!!!!!!!!!\n")
+        bot.api.send_message(chat_id: message.chat.id, text: below_msg)
+        bot.api.send_message(chat_id: message.chat.id, text: "!!!!!!!!!!!!!!!!!!!!!!!\n")
+      end
+    else
+      below_msg += "There is no available dates..."
+      bot.api.send_message(chat_id: message.chat.id, text: below_msg)
+    end
+
+    if dates_above.any?
+      dates_above.each { |d| above_msg += date_str(d, dates[d]) }
+      bot.api.send_message(chat_id: message.chat.id, text: above_msg)
+    else
+      above_msg += "There is no available dates..."
+      bot.api.send_message(chat_id: message.chat.id, text: above_msg)
+    end
+  end
+
+  def date_str(date, available)
+    "#{format_date(date)}: #{available}\n"
+  end
+
+  def format_date(date)
+    date.strftime('%d %B %Y')
   end
 
   def stop_scheduler!
@@ -68,5 +95,5 @@ class USBot
   end
 end
 
-bot = USBot.new
+bot = USBot.new(appointment_date: ARGV[0])
 bot.start!

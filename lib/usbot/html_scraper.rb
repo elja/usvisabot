@@ -1,10 +1,6 @@
 class HTMLScraper
   CONFIRMATION = 'AA00824VE4'
-
-  FULLY_BOOKED = "#9C9ACE"
   AVAILABLE = "#9CCFFF"
-
-  GRAB_DATES = [FULLY_BOOKED, AVAILABLE]
 
   LOOK_MONTHS = 2
   MONDAY_INDEX = 1
@@ -44,26 +40,13 @@ class HTMLScraper
 
       month_select = page.find(:select, 'nDate')
       current_month = month_select.find_all(:option)[month_index]
-      month_text = current_month.text.gsub(/\s+/, ' ')
-
-      dates[month_text] = {
-        available: [],
-        fully_booked: []
-      }
+      month_text = current_month.text
 
       page.find_all('td.formfield').each do |td|
-        if (color = td['bgcolor']&.upcase) && GRAB_DATES.include?(color)
-          is_monday = td.find(:xpath, '..').find_all('td').index(td) == MONDAY_INDEX
-
-          next if is_monday
-
-          if color == FULLY_BOOKED
-            dates[month_text][:fully_booked] << build_date(month_text, td)
-          elsif color == AVAILABLE
-            links = td.find_all('a')
-            date = build_date(month_text, links[0])
-            dates[month_text][:available] << "#{date}: #{links[1].text}"
-          end
+        if (color = td['bgcolor']&.upcase) && color == AVAILABLE
+          links = td.find_all('a')
+          date = build_date(month_text, links[0])
+          dates[date] = links[1].text
         end
       end
     end
@@ -80,7 +63,7 @@ class HTMLScraper
   end
 
   def build_date(date, month)
-    "#{grab_month(month)} #{date}".gsub(/\s+/, ' ')
+    Date.parse("#{grab_month(month)} #{date}".gsub(/\s+/, ' '))
   end
 
   def grab_month(node)
