@@ -27,7 +27,7 @@ class USBot
 
   private
 
-  def print_dates(bot, message)
+  def print_dates(bot, message, all: true)
     scraper = HTMLScraper.new
     dates = scraper.scrap!
 
@@ -38,13 +38,27 @@ class USBot
     dates_above = []
 
     dates.keys.each do |date|
-      next if date.monday?
-
       if date < @appointment_date
         dates_below << date
       else
         dates_above << date
       end
+    end
+
+    unless all
+      if dates_below.any?
+        dates_below.each { |d| below_msg += date_str(d, dates[d]) }
+
+        10.times do
+          bot.api.send_message(chat_id: message.chat.id, text: "!!!!!!!!!!!!!!!!!!!!!!!\n")
+          bot.api.send_message(chat_id: message.chat.id, text: below_msg)
+          bot.api.send_message(chat_id: message.chat.id, text: "!!!!!!!!!!!!!!!!!!!!!!!\n")
+
+          sleep(1)
+        end
+      end
+
+      return
     end
 
     if dates_below.any?
@@ -86,7 +100,7 @@ class USBot
     stop_scheduler! if scheduler.up?
 
     scheduler.every '1m' do
-      print_dates(bot, message)
+      print_dates(bot, message, all: false)
     end
   end
 
